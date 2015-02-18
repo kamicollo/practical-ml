@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html>
+
+  <head>
+    <meta charset='utf-8'>
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <meta name="description" content="Practical-ml : Course project for Practical Machine learning class">
+
+    <link rel="stylesheet" type="text/css" media="screen" href="stylesheets/stylesheet.css">
+
+    <title>Practical-ml</title>
+  </head>
+
+  <body>
+
+    <!-- HEADER -->
+    <div id="header_wrap" class="outer">
+        <header class="inner">
+          <a id="forkme_banner" href="https://github.com/kamicollo/practical-ml">View on GitHub</a>
+
+          <h1 id="project_title">Practical-ml</h1>
+          <h2 id="project_tagline">Course project for Practical Machine learning class</h2>
+
+            <section id="downloads">
+              <a class="zip_download_link" href="https://github.com/kamicollo/practical-ml/zipball/master">Download this project as a .zip file</a>
+              <a class="tar_download_link" href="https://github.com/kamicollo/practical-ml/tarball/master">Download this project as a tar.gz file</a>
+            </section>
+        </header>
+    </div>
+
+    <!-- MAIN CONTENT -->
+    <div id="main_content_wrap" class="outer">
+      <section id="main_content" class="inner">
+        <hr>
+
+<p>title: "Course project - Practical machine learning"
+author: "Aurimas R."
+date: "02/17/2015"</p>
+
+<h2>
+<a id="output-html_document" class="anchor" href="#output-html_document" aria-hidden="true"><span class="octicon octicon-link"></span></a>output: html_document</h2>
+
+<pre><code></code></pre>
+<p>This reports presents the process of building a machine learning algorithm for differentiating between correct and incorrect usage of dumbbell based on data collected from wearable sensors attached to dumbbell users. First, the data collected is considered; then, its preprocessing and feature selection is discussed. Three different ML models are built and using cross-validation techniques the best model is selected. The best model uses random forests technique and achieved near 100% accuracy in out-of-sample testing.</p>
+
+<h1>
+<a id="data-overview" class="anchor" href="#data-overview" aria-hidden="true"><span class="octicon octicon-link"></span></a>Data overview</h1>
+
+<pre lang="r,"><code>source("preprocessing.R")
+</code></pre>
+
+<p>The data used to build the ML algorithms is from a study by Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, <a href="http://groupware.les.inf.puc-rio.br/har">(H. Qualitative Activity Recognition of Weight Lifting Exercises)</a>. Note that the original study does not include a codebook, so this report infers them from their names. The training dataset includes <code>r dim(o_training)[1]</code> observations and <code>r dim(o_training)[2]</code> variables. The variables can be grouped into the following categories:</p>
+
+<ul>
+<li>Metadata: observation id ("X"), name of participant ("user_name")</li>
+<li>Time-related metadata: timestamps of observations and variables indicating the sliding window of observations (<code>r paste("'", names(o_training)[3:7], "'", collapse=", ")</code>)</li>
+<li>Sensor data from four sensors attached to belt, arm, forearm and dumbbell:
+
+<ul>
+<li>Six types of data are included: yaw, roll and pitch (3-dimensional axes), acceleration (x/y/z dimensions), magnetical data (x/y/z dimensions), and gyroscope (x/y/z dimensions) data.</li>
+<li>For each sensor-data combination the following statistics are included: raw data, kurtosis, skenewess, maximum, minimum, amplitude, average, standard deviation and variance.</li>
+</ul>
+</li>
+<li>Class, indicating whether the dumbbell was used correctly (A class indicates correct lifting; classes B-E indicate different wrong lifting types; see original paper for details)</li>
+</ul>
+
+<p>The data is quite balanced, with all classes represented relatively equally (slightly more of class A):</p>
+
+<div class="highlight highlight-r"><pre>table(<span class="pl-vo">o_training</span><span class="pl-k">$</span><span class="pl-vo">classe</span>)</pre></div>
+
+<h1>
+<a id="preprocessing" class="anchor" href="#preprocessing" aria-hidden="true"><span class="octicon octicon-link"></span></a>Preprocessing</h1>
+
+<p>Several pre-processing steps were performed:
+1) All variables were converted to appropriate forms (e.g. numeric / time or date / factors)
+2) Variables with over 50% of missing entries were deleted (this removed <code>r length(missing_features)</code> variables)
+3) metadata (see data description above, #1 and #2) was excluded and a ML prediction algorithm should be generic and not depend on this data.
+4) Zero-variance variables were deleted (defined as variables where less than 5% of values are unique). This resulted in additional <code>r length(zerovar)</code> variables removed.
+5) A check for linearly related features was performed (none found).
+6) All numeric features were scaled to 1 standard deviation and centered around 0.</p>
+
+<p>This resulted in a training dataset with <code>r dim(training)[1]</code> observations and <code>r dim(training)[2]</code> remaining features. For implementation details, we refer to the <a href="preprocessing.R">preprocessing R script</a>.</p>
+
+<h1>
+<a id="analysis-performed" class="anchor" href="#analysis-performed" aria-hidden="true"><span class="octicon octicon-link"></span></a>Analysis performed</h1>
+
+<p>Before a model is built, it is important to consider if all variables should be included as features. However, due to lack of domain knowledge and detailed codebook, the author of this paper had to rule out any knowledge-based selection. Instead, an ad-hoc graphical inspection was performed. As the density plots indicate, randomly selected 4 variables all show limited variations between classes. A more detailed review of correlation matrices also did not reveal clear indications for model selection. Instead, all variables will be included as features into the models.</p>
+
+<pre lang="r,"><code>
+featurePlot(x = training[, (c(6,20,22,50)), with=F],
+             y = training$classe,
+             plot = "density",
+             scales = list(x = list(relation="free"),
+                           y = list(relation="free")),
+             adjust = 1.5,
+             pch = "|",
+             layout = c(4, 1),
+             auto.key = list(columns = 3))
+</code></pre>
+
+<h1>
+<a id="model-selection" class="anchor" href="#model-selection" aria-hidden="true"><span class="octicon octicon-link"></span></a>Model selection</h1>
+
+<div class="highlight highlight-r"><pre>source(<span class="pl-s1"><span class="pl-pds">"</span>prediction.R<span class="pl-pds">"</span></span>)</pre></div>
+
+<p>Model selection was performed as follows:</p>
+
+<p>1) Three different algorithms were considered: classification trees, stochastic gradient boosting and random forests;
+2) Training dataset was divided into three parts: training set, cross-validation set and testing set.
+    * Training set will be used to train the three different models
+    * Cross-validation set will be used to determine the best performing algorithm (based on accuracy)
+    * Testing set will be used to approximate an out-of-sample accuracy
+3) All algorithms were tuned by using simple bootstrapping (25 resampling iterations, caret default). In particular, this means that the classification trees were tuned to 1 parameter, stochastic gradient boosting to 3 parameters and random forests to 1 parameter.</p>
+
+<p>The implementation details of the model selection are presented in <a href="prediction.R">a prediction R script</a>. Note that model training is resource-heavy, and while the underlying code relies on <code>data.table</code> and <code>parallel</code> packages to speed up the process, the whole procedure takes ~1 hour on a modern, 8 GB RAM, 8-core processor laptop.</p>
+
+<h2>
+<a id="performance-of-three-models" class="anchor" href="#performance-of-three-models" aria-hidden="true"><span class="octicon octicon-link"></span></a>Performance of three models</h2>
+
+<p>The three models achieved the following accuracy on the training set:</p>
+
+<pre lang="r,"><code>print(paste("Accuracy on training data - CART: ", cm_tr_rpart$overall[["Accuracy"]]))
+print(paste("Accuracy on training data - random forests: ", cm_tr_rf$overall[["Accuracy"]]))
+print(paste("Accuracy on training data - Gradient Boosting: ", cm_tr_gbm$overall[["Accuracy"]]))
+</code></pre>
+
+<p>The performance on the cross-validation set was as follows:</p>
+
+<pre lang="r,"><code>print(paste("Accuracy on CV data - CART: ", cm_cv1_rpart$overall[["Accuracy"]]))
+print(paste("Accuracy on CV data - random forests: ", cm_cv1_rf$overall[["Accuracy"]]))
+print(paste("Accuracy on CV data - Gradient Boosting: ", cm_cv1_gbm$overall[["Accuracy"]]))
+</code></pre>
+
+<p>Based on the above, we selected random forests as the top performing algorithm (gbm performed perfectly, too, so the choice was random). To estimate the out-of-sample accuracy (1 - error rate), we tested its accuracy over the testing set:</p>
+
+<pre lang="r,"><code>print(cm_cv2_rf)
+</code></pre>
+
+<p>It appears that overfitting should not be a significant issue, as the model performed nearly perfectly - just as it did in the previous datasets. Note that all three models are provided as RData files in folder <a href="data"><code>data</code></a> in case the reader would like to try them out independently.</p>
+
+<h1>
+<a id="potential-improvements" class="anchor" href="#potential-improvements" aria-hidden="true"><span class="octicon octicon-link"></span></a>Potential improvements</h1>
+
+<p>While the above model performed perfectly, there are potential improvements to be made. In particular, the training time is very high (~30 minutes for the selected model). We investigate possibilities to reduce the number of features in the model to cut down training time. </p>
+
+<p>This was done by selecting only top 5 features identified as most important by <code>varImp()</code> function.</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-vo">imp</span> <span class="pl-k">&lt;-</span> varImp(<span class="pl-vo">m_rf</span><span class="pl-k">$</span><span class="pl-vo">finalModel</span>, <span class="pl-v">scale</span><span class="pl-k">=</span><span class="pl-c1">T</span>)
+<span class="pl-vo">n</span> <span class="pl-k">&lt;-</span> order(<span class="pl-vo">imp</span>[,<span class="pl-c1">1</span>], <span class="pl-v">decreasing</span> <span class="pl-k">=</span> <span class="pl-c1">T</span>)[<span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-c1">5</span>]
+<span class="pl-vo">key_features</span> <span class="pl-k">&lt;-</span> rownames(<span class="pl-vo">imp</span>)[order(<span class="pl-vo">imp</span>[,<span class="pl-c1">1</span>], <span class="pl-v">decreasing</span> <span class="pl-k">=</span> <span class="pl-c1">T</span>)[<span class="pl-c1">1</span><span class="pl-k">:</span><span class="pl-c1">5</span>]]
+<span class="pl-vo">key_features</span></pre></div>
+
+<p>We then retrained random forest model using only the top 5 features. The results were as follows:</p>
+
+<div class="highlight highlight-r"><pre><span class="pl-vo">tr_selected</span> <span class="pl-k">&lt;-</span> <span class="pl-vo">tr_data</span>[, (c(<span class="pl-s1"><span class="pl-pds">"</span>.outcome<span class="pl-pds">"</span></span>, <span class="pl-vo">f</span>)), <span class="pl-v">with</span><span class="pl-k">=</span><span class="pl-c1">F</span>]
+<span class="pl-vo">m_rf_s</span> <span class="pl-k">&lt;-</span> train(.<span class="pl-vo">outcome</span> <span class="pl-k">~</span> ., <span class="pl-v">data</span><span class="pl-k">=</span><span class="pl-vo">tr_selected</span>, <span class="pl-v">method</span><span class="pl-k">=</span><span class="pl-s1"><span class="pl-pds">"</span>rf<span class="pl-pds">"</span></span>, <span class="pl-v">trControl</span><span class="pl-k">=</span>trainControl(<span class="pl-v">seeds</span><span class="pl-k">=</span>setSeeds(<span class="pl-c1">135790</span>)))
+<span class="pl-vo">trs_pred_rf</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-vo">m_rf_s</span>, <span class="pl-vo">tr_data</span>)
+<span class="pl-vo">cm_trs_rf</span> <span class="pl-k">&lt;-</span> confusionMatrix(<span class="pl-vo">trs_pred_rf</span>, <span class="pl-vo">tr_data</span><span class="pl-k">$</span>.<span class="pl-vo">outcome</span>)
+<span class="pl-vo">cv1s_pred_rf</span> <span class="pl-k">&lt;-</span> predict(<span class="pl-vo">m_rf_s</span>, <span class="pl-vo">cv1_data</span>)
+<span class="pl-vo">cm_cv1s_rf</span> <span class="pl-k">&lt;-</span> confusionMatrix(<span class="pl-vo">cv1s_pred_rf</span>, <span class="pl-vo">cv1_data</span><span class="pl-k">$</span><span class="pl-vo">classe</span>)
+print(paste(<span class="pl-s1"><span class="pl-pds">"</span>Accuracy on training data - random forests (5-features): <span class="pl-pds">"</span></span>, <span class="pl-vo">cm_tr2_rf</span><span class="pl-k">$</span><span class="pl-vo">overall</span>[[<span class="pl-s1"><span class="pl-pds">"</span>Accuracy<span class="pl-pds">"</span></span>]]))
+print(paste(<span class="pl-s1"><span class="pl-pds">"</span>Accuracy on CV data - random forests (5-features): <span class="pl-pds">"</span></span>, <span class="pl-vo">cm_cv12_rf</span><span class="pl-k">$</span><span class="pl-vo">overall</span>[[<span class="pl-s1"><span class="pl-pds">"</span>Accuracy<span class="pl-pds">"</span></span>]]))</pre></div>
+
+<p>In conclusion, if the small precision loss is acceptable, significant efficiency gains can be gained by limiting features to top 5. This already indicates that not all sensors are needed and further analysis could reveal that high accuracy may be achievable with 2 or even 1 sensor at all. This would have significant implications to actual implementation of such monitoring in real world.</p>
+      </section>
+    </div>
+
+    <!-- FOOTER  -->
+    <div id="footer_wrap" class="outer">
+      <footer class="inner">
+        <p class="copyright">Practical-ml maintained by <a href="https://github.com/kamicollo">kamicollo</a></p>
+        <p>Published with <a href="http://pages.github.com">GitHub Pages</a></p>
+      </footer>
+    </div>
+
+    
+
+  </body>
+</html>
