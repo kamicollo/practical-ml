@@ -14,7 +14,7 @@ This reports presents the process of building a machine learning algorithm for d
 #Data overview
 
 ```{r, echo=FALSE, message=FALSE}
-source("preprocessing.R")
+source("~/Coursera/predmachlearn-011/project/preprocessing.R")
 ```
 
 The data used to build the ML algorithms is from a study by Velloso, E.; Bulling, A.; Gellersen, H.; Ugulino, W.; Fuks, [(H. Qualitative Activity Recognition of Weight Lifting Exercises)](http://groupware.les.inf.puc-rio.br/har). Note that the original study does not include a codebook, so this report infers them from their names. The training dataset includes `r dim(o_training)[1]` observations and `r dim(o_training)[2]` variables. The variables can be grouped into the following categories:
@@ -34,6 +34,7 @@ table(o_training$classe)
 #Preprocessing
 
 Several pre-processing steps were performed:
+
 1) All variables were converted to appropriate forms (e.g. numeric / time or date / factors)
 2) Variables with over 50% of missing entries were deleted (this removed `r length(missing_features)` variables)
 3) metadata (see data description above, #1 and #2) was excluded and a ML prediction algorithm should be generic and not depend on this data.
@@ -64,7 +65,7 @@ featurePlot(x = training[, (c(6,20,22,50)), with=F],
 #Model selection
 
 ```{r echo=FALSE, message=FALSE}
-source("prediction.R")
+source("~/Coursera/predmachlearn-011/project/prediction.R")
 ```
 
 Model selection was performed as follows:
@@ -82,19 +83,19 @@ The implementation details of the model selection are presented in [a prediction
 
 The three models achieved the following accuracy on the training set:
 ```{r, echo=FALSE}
-print(paste("Accuracy on training data - CART: ", cm_tr_rpart$overall[["Accuracy"]]))
-print(paste("Accuracy on training data - random forests: ", cm_tr_rf$overall[["Accuracy"]]))
-print(paste("Accuracy on training data - Gradient Boosting: ", cm_tr_gbm$overall[["Accuracy"]]))
+print(paste("Accuracy on training data - CART: ", percent(cm_tr_rpart$overall[["Accuracy"]])))
+print(paste("Accuracy on training data - random forests: ", percent(cm_tr_rf$overall[["Accuracy"]])))
+print(paste("Accuracy on training data - Gradient Boosting: ", percent(cm_tr_gbm$overall[["Accuracy"]])))
 ```
 
 The performance on the cross-validation set was as follows:
 ```{r, echo=FALSE}
-print(paste("Accuracy on CV data - CART: ", cm_cv1_rpart$overall[["Accuracy"]]))
-print(paste("Accuracy on CV data - random forests: ", cm_cv1_rf$overall[["Accuracy"]]))
-print(paste("Accuracy on CV data - Gradient Boosting: ", cm_cv1_gbm$overall[["Accuracy"]]))
+print(paste("Accuracy on CV data - CART: ", percent(cm_cv1_rpart$overall[["Accuracy"]])))
+print(paste("Accuracy on CV data - random forests: ", percent(cm_cv1_rf$overall[["Accuracy"]])))
+print(paste("Accuracy on CV data - Gradient Boosting: ", percent(cm_cv1_gbm$overall[["Accuracy"]])))
 ```
 
-Based on the above, we selected random forests as the top performing algorithm (gbm performed perfectly, too, so the choice was random). To estimate the out-of-sample accuracy (1 - error rate), we tested its accuracy over the testing set:
+Based on the above, we selected random forests as the top performing algorithm. To estimate the out-of-sample accuracy (1 - error rate), we tested its accuracy over the testing set:
 
 ```{r, echo=FALSE}
 print(cm_cv2_rf)
@@ -108,7 +109,7 @@ While the above model performed perfectly, there are potential improvements to b
 
 This was done by selecting only top 5 features identified as most important by `varImp()` function.
 
-```{r}
+```{r, echo=FALSE}
 imp <- varImp(m_rf$finalModel, scale=T)
 n <- order(imp[,1], decreasing = T)[1:5]
 key_features <- rownames(imp)[order(imp[,1], decreasing = T)[1:5]]
@@ -116,15 +117,15 @@ key_features
 ```
 
 We then retrained random forest model using only the top 5 features. The results were as follows:
-```{r}
-tr_selected <- tr_data[, (c(".outcome", f)), with=F]
+```{r, echo=FALSE}
+tr_selected <- tr_data[, (c(".outcome", key_features)), with=F]
 m_rf_s <- train(.outcome ~ ., data=tr_selected, method="rf", trControl=trainControl(seeds=setSeeds(135790)))
 trs_pred_rf <- predict(m_rf_s, tr_data)
 cm_trs_rf <- confusionMatrix(trs_pred_rf, tr_data$.outcome)
 cv1s_pred_rf <- predict(m_rf_s, cv1_data)
 cm_cv1s_rf <- confusionMatrix(cv1s_pred_rf, cv1_data$classe)
-print(paste("Accuracy on training data - random forests (5-features): ", cm_tr2_rf$overall[["Accuracy"]]))
-print(paste("Accuracy on CV data - random forests (5-features): ", cm_cv12_rf$overall[["Accuracy"]]))
+print(paste("Accuracy on training data - random forests (5-features): ", percent(cm_trs_rf$overall[["Accuracy"]])))
+print(paste("Accuracy on CV data - random forests (5-features): ", percent(cm_cv1s_rf$overall[["Accuracy"]])))
 ``` 
 
 In conclusion, if the small precision loss is acceptable, significant efficiency gains can be gained by limiting features to top 5. This already indicates that not all sensors are needed and further analysis could reveal that high accuracy may be achievable with 2 or even 1 sensor at all. This would have significant implications to actual implementation of such monitoring in real world.

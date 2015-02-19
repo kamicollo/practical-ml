@@ -3,6 +3,7 @@ library(Hmisc)
 library(randomForest)
 library(doMC)
 library(data.table)
+library(scales)
 registerDoMC(cores=6)
 set.seed(135790)
 
@@ -29,7 +30,7 @@ setnames(tr_data, "classe", ".outcome")
 m_rpart <- train(.outcome ~ ., data=tr_data, method="rpart", trControl=trainControl(seeds=setSeeds(135790)))
 m_rf <- train(.outcome ~ ., data=tr_data, method="rf", trControl=trainControl(seeds=setSeeds(135790)))
 m_gbm <- train(.outcome ~ ., data=tr_data, method="gbm", trControl=trainControl(seeds=setSeeds(135790)))
-save(m_rpart, file="n~/Coursera/predmachlearn-011/project/data/new_rpart.RData")
+save(m_rpart, file="~/Coursera/predmachlearn-011/project/data/new_rpart.RData")
 save(m_rf, file="~/Coursera/predmachlearn-011/project/data/new_rf.RData")
 save(m_gbm, file="~/Coursera/predmachlearn-011/project/data/new_gbm.RData")
 
@@ -58,4 +59,3 @@ cm_cv1_gbm <- confusionMatrix(cv1_pred_gbm, cv1_data$classe)
 #get out-of-sample prediction accuracy
 cv2_pred_rf <- predict(m_rf, cv2_data)
 cm_cv2_rf <- confusionMatrix(cv2_pred_rf, cv2_data$classe)
-
